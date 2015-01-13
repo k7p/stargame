@@ -1,0 +1,315 @@
+<html lang="en">
+<meta charset="utf-8">
+
+	<head>
+		<title>Star Wars Empire Blast</title>
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+<link rel="icon" type="image/jpeg" href="img/favicon.jpeg" />      
+
+
+		<style type="text/css">
+
+			html, body {
+			width:1024px;
+			height:768px;
+			margin: 0;
+			padding: 0;
+			}
+
+
+
+			body {
+
+				margin: 0px;
+				overflow: hidden;
+				width : 1024px;
+
+				-webkit-transform: translateZ(-1000px);
+				transform: translateZ(-1000px);
+				-webkit-transform-style: preserve-3d;
+				transform-style: preserve-3d;
+
+
+			}
+
+			.parallax {
+				position : absolute;
+				display : block;
+				width : 256px;
+				height : 384px;
+				-webkit-transform-origin : 0px 0px;
+
+				transform-origin : 0px 0px;
+
+			}
+
+			.container {
+
+				position : absolute;
+				display : block;
+				/*-webkit-transform-style: preserve-3d;
+				-webkit-transform : translateZ(0px);*/
+				-webkit-transform-style: preserve-3d;
+				transform-style: preserve-3d;
+				-webkit-transform : translateZ(0px);
+				transform : translateZ(0px);
+				overflow : hidden;
+				pointer-events :none;
+
+
+			}
+
+		</style>
+	</head>
+	<body style="height:768px;">
+
+<script type="text/javascript">
+alert("I made this with help from multiple online tutorials by Seb Lee-Delisle and lots of googling (sorry, it only works on Chrome at the moment");
+</script>
+		  
+
+<noscript>
+	<div class="noscriptmsg" style="z-index:600;color:red;font-size:3em;background-color:yellow;">
+	<br><br><br><br>Sorry, you don't have JavaScript enabled, so this game will not run.
+	</div>
+</noscript>
+
+
+
+		<script src="js/Ships.js"></script>
+		<script src="js/Particles.js"></script>
+		<script>
+
+
+
+			var monsterset="monster0";
+			var hits=0;
+			var timer=1920; // Time for game in frame counts. There are 60 frames a second so 1800=30 seconds
+			var waitingforresponse=0;
+
+
+
+			//document object model
+			var container =	document.createElement('div'),
+      //contains the spaceships and layered backgrounds
+
+				layer1 = document.createElement('div'),
+				layer2 = document.createElement('div'),
+
+			// screen size
+				SCREEN_WIDTH = 1024,
+				SCREEN_HEIGHT = 768,
+				HALF_WIDTH = SCREEN_WIDTH / 2,
+				HALF_HEIGHT = SCREEN_HEIGHT / 2,
+
+			// ship variables
+				ships = [],
+				spareships = [],
+				counter = 0,
+				blastSound,
+
+			// creates and emits particles upon explosions
+			 	emitter = new Emitter(container);
+
+
+			initSounds();
+
+			// set up the CSS for the DOM elements
+			layer1.className = "parallax";
+			layer1.style.background = 'url(img/parallaxBack.jpg)';
+			document.body.appendChild(layer1);
+
+			layer2.className = "parallax";
+			layer2.style.background = 'url(img/parallaxFront.png) transparent';
+			document.body.appendChild(layer2);
+
+			container.className = "container";
+			container.style.webkitPerspective= "400";
+			    	container.style.webkitPerspectiveOrigin= HALF_WIDTH+"px "+HALF_HEIGHT+"px";
+			container.style.width = SCREEN_WIDTH;
+			container.style.height = SCREEN_HEIGHT;
+
+			document.body.appendChild(container);
+			window.addEventListener("load", init);
+
+			function init() {
+
+				initMouseListeners();
+				setInterval(gameLoop, 1000/60); //divide 1000/frame_rate for seconds for fps -> mils/frame
+			}
+
+			function gameLoop()
+			{
+
+//////////////////////////////////////////////////////////////////////////////////////////
+				//if (waitingforresponse==1){}
+			//	else {
+				//aeh added 6 2013 to time a session (number of frames per 1000 milliseconds is set above as 60)
+				var secs=timer/60;
+				if(timer%60==0){ //every second update time remaining
+					var str='Time Left<br> '+secs+' ';
+				document.getElementById("timer").innerHTML=str;
+					}
+				if (timer<0) {
+					waitingforresponse=1;
+
+					alert("Time's up! Click OK to try and beat your score!");
+					waitingforresponse=0;timer=1800;hits=0;//web version where there is nowhere to return to.
+					var str='Hit Count<br> '+hits+' ';
+					document.getElementById("counter").innerHTML=str;
+					}
+				timer=timer-1;
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+				if(counter++%20==0)	makeShip();
+				//counter%20 = 0 every 20 frames
+
+				// update the parallax layers
+				layer1.style.webkitTransform = "translate3d(0px, "+(-768 +((counter*5)%768))+"px, -999px) scale(4)";
+				layer2.style.webkitTransform  = "translate3d(0px, "+(-768 +((counter*10)%768))+"px, -998px) scale(4)";
+
+			  	// iteratate through each fish
+				for (i=0; i<ships.length; i++) {
+					var fish = ships[i];
+					if(!fish.enabled) continue;
+
+					// update the ships position properties
+					fish.update();
+
+					// and then update the visible object for that fish
+					fish.render();
+
+					// if the fish is way off the top of the screen, then
+					// remove it. For the finished game you would probably
+					// add some kind of score penalty at this point.
+					if(fish.posY <-200) removeFish(fish);
+
+				}
+
+				// then update all the particles.
+				emitter.update();
+
+			}
+
+			function makeShip() {
+				var fish;
+
+				// create a new fish in the bottom middle of the stage
+				if(spareships.length>0) {
+					// if one is already in the spare array, recycle it
+					fish = spareships.pop();
+					fish.enabled = true;
+					fish.domElement.style.visibility = "visible";
+				} else {
+					// otherwise make a new one
+					// Work out the fishimage URL
+					var fishImageURL = "img/orangefish0"+((ships.length % 4) + 1)+".png";
+					// and then make a new fish object
+					fish = new Ship(0, 0, 0, fishImageURL, 128, 128);
+					// add it into the array of ships
+					ships.push(fish);
+
+					// then add touch and mousedown events to the fish.
+					fish.domElement.addEventListener("mouseover", fishMouseOver, true);
+					fish.domElement.addEventListener("touchstart", fishTouched, true);
+
+					container.appendChild(fish.domElement);
+
+				}
+
+				fish.posX = HALF_WIDTH + randomRange(-250,250);
+				fish.posY = SCREEN_HEIGHT+100;
+				fish.posZ = randomRange(-250,250);
+
+				// give it a random x and y velocity
+				fish.velX = randomRange(-1,1);
+				fish.velY = randomRange(-1,-2);
+				fish.velZ = randomRange(-1,1);
+
+				fish.size = 1;
+				fish.gravity = -0.05;
+
+			}
+
+			function removeFish(fish) {
+				fish.enabled = false;
+				fish.domElement.style.visibility = "hidden";
+				spareships.push(fish);
+			}
+
+			function fishMouseOver(event) {
+				event.preventDefault();
+				var fish = getFishFromElement(event.target);
+				if(fish) explodeFish(fish);
+			}
+
+			function fishTouched(event) {
+				event.preventDefault();
+				for(var j=0; j<event.changedTouches.length; j++) {
+					var fish = getFishFromElement(event.target);
+					if(fish) explodeFish(fish);
+				}
+			}
+
+			function getFishFromElement(domElement) {
+				for(var i=0; i<ships.length;i++) {
+					if(ships[i].domElement == domElement) return ships[i];
+				}
+				return false;
+			}
+
+			function explodeFish(fish) {
+				playBurst();
+				emitter.makeExplosion(fish.posX, fish.posY, fish.posZ);
+				removeFish(fish);
+
+			}
+
+			function initMouseListeners() {
+				document.addEventListener('mousemove', preventDefault, false);
+				document.addEventListener( 'mousedown', preventDefault, false );
+				document.addEventListener( 'mouseup', preventDefault, false );
+				document.addEventListener( 'touchstart', preventDefault, false );
+				document.addEventListener( 'touchmove', preventDefault, false );
+				document.addEventListener( 'touchend', preventDefault, false );
+			}
+
+			function preventDefault(event) {
+				event.preventDefault();
+			}
+
+			function initSounds() {
+				blastSound = new Audio("sounds/explode2.m4a");
+				blastSound.load();
+				// you have to play the sound to make sure it's loaded, otherwise you get
+				// a glitch the first time you play it
+				blastSound.volume = 0;
+				blastSound.play();
+
+			}
+
+			function playBurst() {
+				blastSound.volume = 1;
+				blastSound.play();
+				hits += 1;
+				var str='Hit Count<br> '+hits+' ';
+				document.getElementById("counter").innerHTML=str;
+			}
+
+			function randomRange(min, max){
+				return (Math.random()*(max-min))+min;
+			}
+
+		</script>
+
+		<div id="counter" style="position:fixed;z-index:500;top:0px;left:0px;width:100px;height:100px;background-color:none;color:yellow;font-size:30px;font-family:verdana;text-align:left;padding:20px;padding-right:40px;font-weight: bold;font-style: italic;">Hit Count<br> 0</div>
+	<div id="timer" style="position:fixed;z-index:500;top:0px;right:0px;width:100px;height:100px;background-color:none;color:yellow;font-size:30px;font-family:verdana;text-align:right;padding:20px;padding-right:50px;font-weight: bold;font-style: italic;">Time Left<br>starting</div>
+	<div id="finishbanner"></div>
+
+
+	</body>
+</html>
